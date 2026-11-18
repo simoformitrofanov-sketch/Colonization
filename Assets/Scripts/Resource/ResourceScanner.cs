@@ -1,3 +1,6 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class ResourceScanner : MonoBehaviour
@@ -5,8 +8,40 @@ public class ResourceScanner : MonoBehaviour
     [SerializeField] private Collider _ground;
     [SerializeField] private LayerMask _resourceMask;
     [SerializeField, Min(0.1f)] private float _scanHeight = 2f;
+    [SerializeField, Min(0.1f)] private float _scanInterval = 1f;
 
-    public void Scan(ResourceRegistry registry)
+    private Coroutine _scanRoutine;
+
+    public event Action<List<Resource>> ResourcesFound;
+
+    private void OnEnable()
+    {
+        _scanRoutine = StartCoroutine(SearchResources());
+    }
+
+    private void OnDisable()
+    {
+        if (_scanRoutine != null)
+        {
+            StopCoroutine(_scanRoutine);
+            _scanRoutine = null;
+        }
+    }
+
+    private IEnumerator SearchResources()
+    {
+        WaitForSeconds delay = new WaitForSeconds(_scanInterval);
+
+        while (enabled)
+        {
+            yield return delay;
+
+            List<Resource> resources = Scan();
+            ResourcesFound?.Invoke(resources);
+        }
+    }
+
+    private List<Resource> Scan()
     {
         Bounds bounds = _ground.bounds;
 
@@ -27,12 +62,16 @@ public class ResourceScanner : MonoBehaviour
             _resourceMask,
             QueryTriggerInteraction.Ignore);
 
+        List<Resource> resources = new List<Resource>();
+
         foreach (Collider foundCollider in colliders)
         {
             if (foundCollider.TryGetComponent(out Resource resource))
             {
-                registry.Register(resource);
+                resources.Add(resource);
             }
         }
+
+        return resources;
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 
 [RequireComponent(typeof(BotMover))]
@@ -9,44 +10,26 @@ public class Bot : MonoBehaviour
     private Resource _resource;
     private Vector3 _returnPosition;
 
-    public enum State
-    {
-        Idle,
-        MovingToResource,
-        ReturningToBase
-    }
+    public event Action<Resource> ResourceDelivered;
 
-    public State CurrentState { get; private set; }
+    public bool IsFree => _resource == null;
 
     private void Awake()
     {
         _mover = GetComponent<BotMover>();
     }
 
-    private void FixedUpdate()
+    private void OnDisable()
     {
-        if (CurrentState == State.Idle)
-        {
-            return;
-        }
+        _mover.TargetReached -= OnResourceReached;
+        _mover.TargetReached -= OnBaseReached;
 
-        _mover.Move();
-
-        if (CurrentState == State.MovingToResource)
-        {
-            if (_mover.IsMoving == false)
-            {
-                _resource.AttachTo(_carryPoint);
-                _mover.SetTarget(_returnPosition);
-
-                CurrentState = State.ReturningToBase;
-            }
-        }
+        _mover.Stop();
     }
 
     public void Collect(Resource resource, Vector3 returnPosition)
     {
-        if (CurrentState != State.Idle || resource == null)
+        if (IsFree == false || resource == null)
         {
             return;
         }
@@ -54,25 +37,27 @@ public class Bot : MonoBehaviour
         _resource = resource;
         _returnPosition = returnPosition;
 
-        _mover.SetTarget(_resource.transform.position);
-
-        CurrentState = State.MovingToResource;
+        _mover.TargetReached += OnResourceReached;
+        _mover.Move(_resource.transform.position);
     }
 
-    public Resource Unload()
+    private void OnResourceReached()
     {
-        if (CurrentState != State.ReturningToBase)
-        {
-            return null;
-        }
+        _mover.TargetReached -= OnResourceReached;
 
-        _mover.Stop();
+        _resource.AttachTo(_carryPoint);
+
+        _mover.TargetReached += OnBaseReached;
+        _mover.Move(_returnPosition);
+    }
+
+    private void OnBaseReached()
+    {
+        _mover.TargetReached -= OnBaseReached;
 
         Resource resource = _resource;
         _resource = null;
 
-        CurrentState = State.Idle;
-
-        return resource;
+        ResourceDelivered?.Invoke(resource);
     }
 }

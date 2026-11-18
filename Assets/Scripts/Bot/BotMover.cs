@@ -1,63 +1,81 @@
+using System;
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody))]
 public class BotMover : MonoBehaviour
 {
-    [SerializeField] private float _speed = 3f;
-    [SerializeField] private float _rotationSpeed = 180f;
+    [SerializeField, Min(0.1f)] private float _speed = 3f;
+    [SerializeField, Min(0.1f)] private float _rotationSpeed = 180f;
+
+    private readonly WaitForFixedUpdate _physicsWait = new WaitForFixedUpdate();
 
     private Rigidbody _rigidbody;
-    private Vector3 _targetPosition;
+    private Coroutine _movementRoutine;
 
-    public bool IsMoving { get; private set; }
+    public event Action TargetReached;
 
     private void Awake()
     {
         _rigidbody = GetComponent<Rigidbody>();
     }
 
-    public void SetTarget(Vector3 targetPosition)
+    private void OnDisable()
     {
-        _targetPosition = targetPosition;
-        _targetPosition.y = _rigidbody.position.y;
-
-        IsMoving = true;
+        Stop();
     }
 
-    public void Move()
+    public void Move(Vector3 targetPosition)
     {
-        if (IsMoving == false)
-        {
-            return;
-        }
+        Stop();
 
-        Vector3 direction = _targetPosition - _rigidbody.position;
+        targetPosition.y = _rigidbody.position.y;
 
-        if (direction == Vector3.zero)
-        {
-            Stop();
-            return;
-        }
-
-        Quaternion targetRotation = Quaternion.LookRotation(direction);
-
-        Quaternion nextRotation = Quaternion.RotateTowards(
-            _rigidbody.rotation,
-            targetRotation,
-            _rotationSpeed * Time.fixedDeltaTime);
-
-        _rigidbody.MoveRotation(nextRotation);
-
-        Vector3 nextPosition = Vector3.MoveTowards(
-            _rigidbody.position,
-            _targetPosition,
-            _speed * Time.fixedDeltaTime);
-
-        _rigidbody.MovePosition(nextPosition);
+        _movementRoutine = StartCoroutine(MoveToTarget(targetPosition));
     }
 
     public void Stop()
     {
-        IsMoving = false;
+        if (_movementRoutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(_movementRoutine);
+        _movementRoutine = null;
+    }
+
+    private IEnumerator MoveToTarget(Vector3 targetPosition)
+    {
+        while (enabled)
+        {
+            yield return _physicsWait;
+
+            Vector3 direction = targetPosition - _rigidbody.position;
+
+            if (direction == Vector3.zero)
+            {
+                break;
+            }
+
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+
+            Quaternion nextRotation = Quaternion.RotateTowards(
+                _rigidbody.rotation,
+                targetRotation,
+                _rotationSpeed * Time.fixedDeltaTime);
+
+            _rigidbody.MoveRotation(nextRotation);
+
+            Vector3 nextPosition = Vector3.MoveTowards(
+                _rigidbody.position,
+                targetPosition,
+                _speed * Time.fixedDeltaTime);
+
+            _rigidbody.MovePosition(nextPosition);
+        }
+
+        _movementRoutine = null;
+        TargetReached?.Invoke();
     }
 }

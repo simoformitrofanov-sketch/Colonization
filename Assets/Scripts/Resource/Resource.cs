@@ -18,4 +18,9 @@ public class Resource : MonoBehaviour
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
     }
+
+    public void ResetState()
+    {
+        _collider.enabled = true;
+    }
 }

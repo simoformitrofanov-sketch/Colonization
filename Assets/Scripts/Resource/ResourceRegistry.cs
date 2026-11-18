@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 public class ResourceRegistry
 {
-    private readonly List<Resource> _freeResources = new List<Resource>();
+    private readonly Queue<Resource> _freeResources = new Queue<Resource>();
     private readonly List<Resource> _reservedResources = new List<Resource>();
 
     public void Register(Resource resource)
@@ -17,35 +17,28 @@ public class ResourceRegistry
             return;
         }
 
-        _freeResources.Add(resource);
+        _freeResources.Enqueue(resource);
     }
 
     public bool TryReserve(out Resource resource)
     {
-        resource = null;
-
         while (_freeResources.Count > 0)
         {
-            int lastIndex = _freeResources.Count - 1;
+            resource = _freeResources.Dequeue();
 
-            Resource candidate = _freeResources[lastIndex];
-            _freeResources.RemoveAt(lastIndex);
-
-            if (candidate != null)
+            if (resource != null)
             {
-                _reservedResources.Add(candidate);
-                resource = candidate;
-
+                _reservedResources.Add(resource);
                 return true;
             }
         }
 
+        resource = null;
         return false;
     }
 
     public void Remove(Resource resource)
     {
-        _freeResources.Remove(resource);
         _reservedResources.Remove(resource);
     }
 }

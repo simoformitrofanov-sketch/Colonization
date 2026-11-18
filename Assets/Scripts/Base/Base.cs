@@ -1,97 +1,55 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(BotSpawner))]
+[RequireComponent(typeof(BotDispatcher))]
 [RequireComponent(typeof(ResourceScanner))]
+[RequireComponent(typeof(ResourceStorage))]
 public class Base : MonoBehaviour
 {
-    [SerializeField, Min(1)] private int _initialBotCount = 3;
-    [SerializeField, Min(0.1f)] private float _scanInterval = 1f;
+    [SerializeField] private ResourceSpawner _resourceSpawner;
 
     private readonly ResourceRegistry _registry = new ResourceRegistry();
-    private readonly List<Bot> _bots = new List<Bot>();
 
-    private BotSpawner _spawner;
+    private BotDispatcher _dispatcher;
     private ResourceScanner _scanner;
-    private Coroutine _resourceSearchRoutine;
-
-    public event Action<int> ResourceCountChanged;
-
-    public int ResourceCount { get; private set; }
+    private ResourceStorage _storage;
 
     private void Awake()
     {
-        _spawner = GetComponent<BotSpawner>();
+        _dispatcher = GetComponent<BotDispatcher>();
         _scanner = GetComponent<ResourceScanner>();
-
-        _bots.AddRange(_spawner.Spawn(_initialBotCount));
+        _storage = GetComponent<ResourceStorage>();
     }
 
     private void OnEnable()
     {
-        _resourceSearchRoutine = StartCoroutine(SearchResourcesAndAssignTasks());
+        _scanner.ResourcesFound += OnResourcesFound;
+        _dispatcher.ResourceDelivered += OnResourceDelivered;
     }
 
     private void OnDisable()
     {
-        if (_resourceSearchRoutine != null)
-        {
-            StopCoroutine(_resourceSearchRoutine);
-            _resourceSearchRoutine = null;
-        }
+        _scanner.ResourcesFound -= OnResourcesFound;
+        _dispatcher.ResourceDelivered -= OnResourceDelivered;
     }
 
-    private void OnTriggerStay(Collider other)
+    private void OnResourcesFound(List<Resource> resources)
     {
-        if (other.TryGetComponent(out Bot bot) == false)
+        foreach (Resource resource in resources)
         {
-            return;
+            _registry.Register(resource);
         }
 
-        Resource resource = bot.Unload();
+        _dispatcher.AssignTasks(_registry, transform.position);
+    }
 
-        if (resource == null)
-        {
-            return;
-        }
-
+    private void OnResourceDelivered(Resource resource)
+    {
         _registry.Remove(resource);
-        Destroy(resource.gameObject);
+        _resourceSpawner.Return(resource);
 
-        ResourceCount++;
-        ResourceCountChanged?.Invoke(ResourceCount);
-    }
+        _storage.Add();
 
-    private IEnumerator SearchResourcesAndAssignTasks()
-    {
-        WaitForSeconds delay = new WaitForSeconds(_scanInterval);
-
-        while (enabled)
-        {
-            _scanner.Scan(_registry);
-            AssignTasks();
-
-            yield return delay;
-        }
-    }
-
-    private void AssignTasks()
-    {
-        foreach (Bot bot in _bots)
-        {
-            if (bot.CurrentState != Bot.State.Idle)
-            {
-                continue;
-            }
-
-            if (_registry.TryReserve(out Resource resource) == false)
-            {
-                return;
-            }
-
-            bot.Collect(resource, transform.position);
-        }
+        _dispatcher.AssignTasks(_registry, transform.position);
     }
 }
