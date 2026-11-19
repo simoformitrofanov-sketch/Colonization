@@ -2,41 +2,52 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-[RequireComponent(typeof(BotSpawner))]
 public class BotDispatcher : MonoBehaviour
 {
     private readonly List<Bot> _bots = new List<Bot>();
 
-    private BotSpawner _spawner;
+    public event Action<int> CountChanged;
 
-    public event Action<Resource> ResourceDelivered;
+    public int Count => _bots.Count;
 
-    private void Awake()
+    public void Add(Bot bot)
     {
-        _spawner = GetComponent<BotSpawner>();
+        _bots.Add(bot);
 
-        _bots.AddRange(_spawner.Spawn());
+        CountChanged?.Invoke(Count);
     }
 
-    private void OnEnable()
+    public bool TryTakeFreeBot(out Bot bot)
     {
-        foreach (Bot bot in _bots)
-        {
-            bot.ResourceDelivered += OnResourceDelivered;
-        }
-    }
+        bot = null;
 
-    private void OnDisable()
-    {
-        foreach (Bot bot in _bots)
+        if (Count <= 1)
         {
-            bot.ResourceDelivered -= OnResourceDelivered;
+            return false;
         }
+
+        for (int i = 0; i < Count; i++)
+        {
+            if (_bots[i].IsFree == false)
+            {
+                continue;
+            }
+
+            bot = _bots[i];
+            _bots.RemoveAt(i);
+
+            CountChanged?.Invoke(Count);
+
+            return true;
+        }
+
+        return false;
     }
 
     public void AssignTasks(
-        ResourceRegistry registry,
-        Vector3 returnPosition)
+        ResourceRegistry registry, 
+        ResourceReservations reservations, 
+        CollectionPoint collectionPoint)
     {
         foreach (Bot bot in _bots)
         {
@@ -45,17 +56,12 @@ public class BotDispatcher : MonoBehaviour
                 continue;
             }
 
-            if (registry.TryReserve(out Resource resource) == false)
+            if (registry.TryReserve(reservations, out Resource resource) == false)
             {
                 return;
             }
 
-            bot.Collect(resource, returnPosition);
+            bot.Collect(resource, collectionPoint);
         }
-    }
-
-    private void OnResourceDelivered(Resource resource)
-    {
-        ResourceDelivered?.Invoke(resource);
     }
 }

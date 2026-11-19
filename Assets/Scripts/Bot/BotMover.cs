@@ -1,4 +1,3 @@
-using System;
 using System.Collections;
 using UnityEngine;
 
@@ -11,42 +10,16 @@ public class BotMover : MonoBehaviour
     private readonly WaitForFixedUpdate _physicsWait = new WaitForFixedUpdate();
 
     private Rigidbody _rigidbody;
-    private Coroutine _movementRoutine;
-
-    public event Action TargetReached;
 
     private void Awake()
     {
         _rigidbody = GetComponent<Rigidbody>();
     }
 
-    private void OnDisable()
+    public IEnumerator MoveTo(Vector3 targetPosition)
     {
-        Stop();
-    }
-
-    public void Move(Vector3 targetPosition)
-    {
-        Stop();
-
         targetPosition.y = _rigidbody.position.y;
 
-        _movementRoutine = StartCoroutine(MoveToTarget(targetPosition));
-    }
-
-    public void Stop()
-    {
-        if (_movementRoutine == null)
-        {
-            return;
-        }
-
-        StopCoroutine(_movementRoutine);
-        _movementRoutine = null;
-    }
-
-    private IEnumerator MoveToTarget(Vector3 targetPosition)
-    {
         while (enabled)
         {
             yield return _physicsWait;
@@ -74,8 +47,5 @@ public class BotMover : MonoBehaviour
 
             _rigidbody.MovePosition(nextPosition);
         }
-
-        _movementRoutine = null;
-        TargetReached?.Invoke();
     }
 }

@@ -12,4 +12,17 @@ public class ResourceStorage : MonoBehaviour
         Count++;
         CountChanged?.Invoke(Count);
     }
+
+    public bool TrySpend(int amount)
+    {
+        if (amount <= 0 || Count < amount)
+        {
+            return false;
+        }
+
+        Count -= amount;
+        CountChanged?.Invoke(Count);
+
+        return true;
+    }
 }

@@ -28,6 +28,11 @@ public class ResourceScanner : MonoBehaviour
         }
     }
 
+    public void Initialize(Collider ground)
+    {
+        _ground = ground;
+    }
+
     private IEnumerator SearchResources()
     {
         WaitForSeconds delay = new WaitForSeconds(_scanInterval);

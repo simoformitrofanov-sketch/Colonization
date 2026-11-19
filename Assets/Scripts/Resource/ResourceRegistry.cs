@@ -12,7 +12,8 @@ public class ResourceRegistry
             return;
         }
 
-        if (_freeResources.Contains(resource) || _reservedResources.Contains(resource))
+        if (_freeResources.Contains(resource) || 
+            _reservedResources.Contains(resource))
         {
             return;
         }
@@ -20,17 +21,22 @@ public class ResourceRegistry
         _freeResources.Enqueue(resource);
     }
 
-    public bool TryReserve(out Resource resource)
+    public bool TryReserve(
+        ResourceReservations reservations, 
+        out Resource resource)
     {
         while (_freeResources.Count > 0)
         {
             resource = _freeResources.Dequeue();
 
-            if (resource != null)
+            if (reservations.TryReserve(resource) == false)
             {
-                _reservedResources.Add(resource);
-                return true;
+                continue;
             }
+
+            _reservedResources.Add(resource);
+
+            return true;
         }
 
         resource = null;
