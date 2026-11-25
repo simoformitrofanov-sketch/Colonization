@@ -2,8 +2,14 @@ using System.Collections.Generic;
 
 public class ResourceRegistry
 {
+    private readonly HashSet<Resource> _sharedReservations;
     private readonly Queue<Resource> _freeResources = new Queue<Resource>();
     private readonly List<Resource> _reservedResources = new List<Resource>();
+
+    public ResourceRegistry(HashSet<Resource> sharedReservations)
+    {
+        _sharedReservations = sharedReservations;
+    }
 
     public void Register(Resource resource)
     {
@@ -12,7 +18,7 @@ public class ResourceRegistry
             return;
         }
 
-        if (_freeResources.Contains(resource) || 
+        if (_freeResources.Contains(resource) ||
             _reservedResources.Contains(resource))
         {
             return;
@@ -21,15 +27,18 @@ public class ResourceRegistry
         _freeResources.Enqueue(resource);
     }
 
-    public bool TryReserve(
-        ResourceReservations reservations, 
-        out Resource resource)
+    public bool TryReserve(out Resource resource)
     {
         while (_freeResources.Count > 0)
         {
             resource = _freeResources.Dequeue();
 
-            if (reservations.TryReserve(resource) == false)
+            if (resource == null || resource.gameObject.activeInHierarchy == false)
+            {
+                continue;
+            }
+
+            if (_sharedReservations.Add(resource) == false)
             {
                 continue;
             }
@@ -46,5 +55,6 @@ public class ResourceRegistry
     public void Remove(Resource resource)
     {
         _reservedResources.Remove(resource);
+        _sharedReservations.Remove(resource);
     }
 }

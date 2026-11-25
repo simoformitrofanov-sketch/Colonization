@@ -11,14 +11,11 @@ public class Base : MonoBehaviour
     private const int BotCost = 3;
     private const int BaseCost = 5;
 
-    [SerializeField] private BotSpawner _botSpawner;
-    [SerializeField] private BaseSpawner _baseSpawner;
-    [SerializeField] private ResourceSpawner _resourceSpawner;
-    [SerializeField] private ResourceReservations _reservations;
     [SerializeField] private BaseFlag _flag;
 
-    private readonly ResourceRegistry _registry = new ResourceRegistry();
-
+    private ResourceRegistry _registry;
+    private BaseSpawner _baseSpawner;
+    private BotSpawner _botSpawner;
     private BotDispatcher _dispatcher;
     private ResourceScanner _scanner;
     private ResourceStorage _storage;
@@ -27,19 +24,13 @@ public class Base : MonoBehaviour
 
     public event Action Changed;
 
-    public int ResourceCount => _storage.Count;
-
-    public int BotCount => _dispatcher.Count;
-
-    public bool HasFlag => _flag.IsPlaced;
-
-    public bool IsBuilding => _builder != null;
-
-    public bool CanPlaceFlag => BotCount > 1 || IsBuilding;
-
     public int ConstructionCost => BaseCost;
-
     public int BotCreationCost => BotCost;
+    public int ResourceCount => _storage.Count;
+    public int BotCount => _dispatcher.Count;
+    public bool CanPlaceFlag => BotCount > 1 || IsBuilding;
+    public bool IsBuilding => _builder != null;
+    public bool HasFlag => _flag.IsPlaced;
 
     private void Awake()
     {
@@ -78,18 +69,23 @@ public class Base : MonoBehaviour
     public void Initialize(
         BaseSpawner baseSpawner,
         BotSpawner botSpawner,
-        ResourceSpawner resourceSpawner,
-        ResourceReservations reservations,
-        Collider ground,
-        Bot founder)
+        ResourceRegistry registry,
+        Collider ground)
     {
         _baseSpawner = baseSpawner;
         _botSpawner = botSpawner;
-        _resourceSpawner = resourceSpawner;
-        _reservations = reservations;
-
+        _registry = registry;
         _scanner.Initialize(ground);
-        _dispatcher.Add(founder);
+    }
+
+    public void StartWorking()
+    {
+        _scanner.StartScanning();
+    }
+
+    public void AddBot(Bot bot)
+    {
+        _dispatcher.Add(bot);
     }
 
     public void PlaceFlag(Vector3 position)
@@ -118,8 +114,7 @@ public class Base : MonoBehaviour
         }
 
         _dispatcher.AssignTasks(
-            _registry, 
-            _reservations, 
+            _registry,
             _collectionPoint);
     }
 
@@ -146,7 +141,7 @@ public class Base : MonoBehaviour
             return;
         }
 
-        if (_dispatcher.TryTakeFreeBot(out Bot builder) == false)
+        if (_dispatcher.TryTakeBuilder(out Bot builder) == false)
         {
             return;
         }
@@ -173,8 +168,7 @@ public class Base : MonoBehaviour
     private void OnBotTaskFinished(Bot bot, Resource resource)
     {
         _registry.Remove(resource);
-        _resourceSpawner.Return(resource);
-        _reservations.Release(resource);
+        resource.Deliver();
 
         _storage.Add();
 
@@ -183,10 +177,7 @@ public class Base : MonoBehaviour
 
     private void OnConstructionSiteReached(Bot bot)
     {
-        Vector3 targetPosition = _flag.Position;
-        targetPosition.y = bot.transform.position.y;
-
-        if (bot.transform.position != targetPosition)
+        if (bot.HasReached(_flag.Position) == false)
         {
             bot.MoveToConstructionSite(_flag.Position);
             return;
@@ -194,7 +185,10 @@ public class Base : MonoBehaviour
 
         bot.ConstructionSiteReached -= OnConstructionSiteReached;
 
-        _baseSpawner.Spawn(_flag.Position, bot);
+        Base newBase = _baseSpawner.Spawn(_flag.Position);
+
+        newBase.AddBot(bot);
+        newBase.StartWorking();
 
         _builder = null;
         _flag.Hide();

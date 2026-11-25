@@ -1,27 +1,43 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-public class BaseSpawner : MonoBehaviour
+public class BaseSpawner
 {
-    [SerializeField] private Base _prefab;
-    [SerializeField] private BotSpawner _botSpawner;
-    [SerializeField] private ResourceSpawner _resourceSpawner;
-    [SerializeField] private ResourceReservations _reservations;
-    [SerializeField] private Collider _ground;
+    private readonly HashSet<Resource> _sharedReservations;
+    private BaseSpawnerConfig _baseSpawnerConfig;
+    private BotSpawner _botSpawner;
+    private Collider _ground;
 
-    public Base Spawn(Vector3 position, Bot founder)
+    public BaseSpawner(
+        HashSet<Resource> sharedReservations,
+        BaseSpawnerConfig baseSpawnerConfig,
+        BotSpawner botSpawner,
+        Collider ground)
     {
-        Base newBase = Instantiate(
-            _prefab,
+        _sharedReservations = sharedReservations;
+        _baseSpawnerConfig = baseSpawnerConfig;
+        _botSpawner = botSpawner;
+        _ground = ground;
+    }
+
+    public Base Spawn(Vector3 position)
+    {
+        Base newBase = Object.Instantiate(
+            _baseSpawnerConfig.Prefab,
             position,
             Quaternion.identity);
+
+        ResourceRegistry registry = new ResourceRegistry(_sharedReservations);
 
         newBase.Initialize(
             this,
             _botSpawner,
-            _resourceSpawner,
-            _reservations,
-            _ground,
-            founder);
+            registry,
+            _ground);
+
+        BaseResourceView resourceView = newBase.GetComponentInChildren<BaseResourceView>(true);
+
+        resourceView.Initialize(newBase);
 
         return newBase;
     }

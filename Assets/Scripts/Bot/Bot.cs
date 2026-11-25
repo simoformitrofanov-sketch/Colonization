@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(BotMover))]
@@ -8,11 +7,12 @@ public class Bot : MonoBehaviour
     [SerializeField] private Transform _carryPoint;
 
     private BotMover _mover;
-    private Coroutine _taskRoutine;
+    private Resource _resource;
+    private CollectionPoint _collectionPoint;
 
     public event Action<Bot> ConstructionSiteReached;
 
-    public bool IsFree => _taskRoutine == null;
+    public bool IsFree { get; private set; } = true;
 
     private void Awake()
     {
@@ -21,11 +21,14 @@ public class Bot : MonoBehaviour
 
     private void OnDisable()
     {
-        if (_taskRoutine != null)
-        {
-            StopCoroutine(_taskRoutine);
-            _taskRoutine = null;
-        }
+        _mover.Arrived -= OnResourceReached;
+        _mover.Arrived -= OnCollectionPointReached;
+        _mover.Arrived -= OnConstructionSiteReached;
+        _mover.StopMoving();
+
+        _resource = null;
+        _collectionPoint = null;
+        IsFree = true;
     }
 
     public void Collect(Resource resource, CollectionPoint collectionPoint)
@@ -35,7 +38,12 @@ public class Bot : MonoBehaviour
             return;
         }
 
-        _taskRoutine = StartCoroutine(CollectResource(resource, collectionPoint));
+        _resource = resource;
+        _collectionPoint = collectionPoint;
+        IsFree = false;
+
+        _mover.Arrived += OnResourceReached;
+        _mover.MoveTo(_resource.transform.position);
     }
 
     public void MoveToConstructionSite(Vector3 position)
@@ -45,27 +53,46 @@ public class Bot : MonoBehaviour
             return;
         }
 
-        _taskRoutine = StartCoroutine(ReachConstructionSite(position));
+        IsFree = false;
+
+        _mover.Arrived += OnConstructionSiteReached;
+        _mover.MoveTo(position);
     }
 
-    private IEnumerator CollectResource(Resource resource, CollectionPoint collectionPoint)
+    public bool HasReached(Vector3 targetPosition)
     {
-        yield return _mover.MoveTo(resource.transform.position);
+        return _mover.HasReached(targetPosition);
+    }
 
-        resource.AttachTo(_carryPoint);
+    private void OnResourceReached()
+    {
+        _mover.Arrived -= OnResourceReached;
 
-        yield return _mover.MoveTo(collectionPoint.transform.position);
+        _resource.AttachTo(_carryPoint);
 
-        _taskRoutine = null;
+        _mover.Arrived += OnCollectionPointReached;
+        _mover.MoveTo(_collectionPoint.transform.position);
+    }
+
+    private void OnCollectionPointReached()
+    {
+        _mover.Arrived -= OnCollectionPointReached;
+
+        Resource resource = _resource;
+        CollectionPoint collectionPoint = _collectionPoint;
+
+        _resource = null;
+        _collectionPoint = null;
+        IsFree = true;
 
         collectionPoint.Collect(this, resource);
     }
 
-    private IEnumerator ReachConstructionSite(Vector3 position)
+    private void OnConstructionSiteReached()
     {
-        yield return _mover.MoveTo(position);
+        _mover.Arrived -= OnConstructionSiteReached;
 
-        _taskRoutine = null;
+        IsFree = true;
 
         ConstructionSiteReached?.Invoke(this);
     }

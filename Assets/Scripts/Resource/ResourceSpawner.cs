@@ -4,29 +4,10 @@ using UnityEngine.Pool;
 
 public class ResourceSpawner : MonoBehaviour
 {
-    [SerializeField] private Resource _prefab;
-    [SerializeField] private Collider _ground;
-    [SerializeField, Min(0.1f)] private float _spawnInterval = 2f;
-    [SerializeField, Min(1)] private int _maxCount = 20;
-    [SerializeField, Min(0f)] private float _edgeOffset = 0.5f;
-
+    private ResourceSpawnerConfig _resourceSpawnerConfig;
     private ObjectPool<Resource> _resourcesPool;
     private Coroutine _spawnRoutine;
-
-    private void Awake()
-    {
-        _resourcesPool = new ObjectPool<Resource>(
-            createFunc: CreateResource,
-            actionOnGet: null,
-            actionOnRelease: OnReturned,
-            actionOnDestroy: DestroyResource,
-            maxSize: _maxCount);
-    }
-
-    private void OnEnable()
-    {
-        _spawnRoutine = StartCoroutine(SpawnResources());
-    }
+    private Collider _ground;
 
     private void OnDisable()
     {
@@ -42,24 +23,31 @@ public class ResourceSpawner : MonoBehaviour
         _resourcesPool.Clear();
     }
 
-    public void Return(Resource resource)
+    public void Initialize(ResourceSpawnerConfig resourceSpawnerConfig, Collider ground)
     {
-        _resourcesPool.Release(resource);
+        _resourceSpawnerConfig = resourceSpawnerConfig;
+        _ground = ground;
+        _resourcesPool = new ObjectPool<Resource>(
+            createFunc: CreateResource,
+            actionOnGet: null,
+            actionOnRelease: OnReturned,
+            actionOnDestroy: DestroyResource,
+            maxSize: _resourceSpawnerConfig.MaxCount);
     }
 
-    private IEnumerator SpawnResources()
+    public void StartSpawning()
     {
-        WaitForSeconds delay = new WaitForSeconds(_spawnInterval);
+        _spawnRoutine = StartCoroutine(SpawnResources());
+    }
 
-        while (enabled)
-        {
-            if (_resourcesPool.CountActive < _maxCount)
-            {
-                Spawn();
-            }
+    private Resource CreateResource()
+    {
+        Resource resource = Instantiate(_resourceSpawnerConfig.Prefab, transform);
 
-            yield return delay;
-        }
+        resource.gameObject.SetActive(false);
+        resource.Delivered += Return;
+        
+        return resource;
     }
 
     private void Spawn()
@@ -67,12 +55,12 @@ public class ResourceSpawner : MonoBehaviour
         Bounds bounds = _ground.bounds;
 
         float x = Random.Range(
-            bounds.min.x + _edgeOffset,
-            bounds.max.x - _edgeOffset);
+            bounds.min.x + _resourceSpawnerConfig.EdgeOffset,
+            bounds.max.x - _resourceSpawnerConfig.EdgeOffset);
 
         float z = Random.Range(
-            bounds.min.z + _edgeOffset,
-            bounds.max.z - _edgeOffset);
+            bounds.min.z + _resourceSpawnerConfig.EdgeOffset,
+            bounds.max.z - _resourceSpawnerConfig.EdgeOffset);
 
         Vector3 position = new Vector3(x, bounds.max.y, z);
 
@@ -85,16 +73,27 @@ public class ResourceSpawner : MonoBehaviour
         resource.ResetState();
         resource.gameObject.SetActive(true);
     }
-
-    private Resource CreateResource()
+   
+    private IEnumerator SpawnResources()
     {
-        Resource resource = Instantiate(_prefab, transform);
+        WaitForSeconds delay = new WaitForSeconds(_resourceSpawnerConfig.SpawnInterval);
 
-        resource.gameObject.SetActive(false);
+        while (enabled)
+        {
+            if (_resourcesPool.CountActive < _resourceSpawnerConfig.MaxCount)
+            {
+                Spawn();
+            }
 
-        return resource;
+            yield return delay;
+        }
     }
 
+    private void Return(Resource resource)
+    {
+        _resourcesPool.Release(resource);
+    }
+   
     private void OnReturned(Resource resource)
     {
         resource.gameObject.SetActive(false);
@@ -103,6 +102,7 @@ public class ResourceSpawner : MonoBehaviour
 
     private void DestroyResource(Resource resource)
     {
+        resource.Delivered -= Return;
         Destroy(resource.gameObject);
     }
 }

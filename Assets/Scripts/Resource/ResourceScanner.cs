@@ -14,11 +14,6 @@ public class ResourceScanner : MonoBehaviour
 
     public event Action<List<Resource>> ResourcesFound;
 
-    private void OnEnable()
-    {
-        _scanRoutine = StartCoroutine(SearchResources());
-    }
-
     private void OnDisable()
     {
         if (_scanRoutine != null)
@@ -33,6 +28,11 @@ public class ResourceScanner : MonoBehaviour
         _ground = ground;
     }
 
+    public void StartScanning()
+    {
+        _scanRoutine = StartCoroutine(SearchResources());
+    }
+
     private IEnumerator SearchResources()
     {
         WaitForSeconds delay = new WaitForSeconds(_scanInterval);
@@ -41,8 +41,7 @@ public class ResourceScanner : MonoBehaviour
         {
             yield return delay;
 
-            List<Resource> resources = Scan();
-            ResourcesFound?.Invoke(resources);
+            ResourcesFound?.Invoke(Scan());
         }
     }
 

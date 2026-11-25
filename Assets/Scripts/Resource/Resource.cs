@@ -1,9 +1,12 @@
+using System;
 using UnityEngine;
 
 [RequireComponent(typeof(Collider))]
 public class Resource : MonoBehaviour
 {
     private Collider _collider;
+
+    public event Action<Resource> Delivered;
 
     private void Awake()
     {
@@ -22,5 +25,10 @@ public class Resource : MonoBehaviour
     public void ResetState()
     {
         _collider.enabled = true;
+    }
+
+    public void Deliver()
+    {
+        Delivered?.Invoke(this);
     }
 }

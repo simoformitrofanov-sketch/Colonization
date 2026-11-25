@@ -17,7 +17,7 @@ public class BotDispatcher : MonoBehaviour
         CountChanged?.Invoke(Count);
     }
 
-    public bool TryTakeFreeBot(out Bot bot)
+    public bool TryTakeBuilder(out Bot bot)
     {
         bot = null;
 
@@ -45,8 +45,7 @@ public class BotDispatcher : MonoBehaviour
     }
 
     public void AssignTasks(
-        ResourceRegistry registry, 
-        ResourceReservations reservations, 
+        ResourceRegistry registry,
         CollectionPoint collectionPoint)
     {
         foreach (Bot bot in _bots)
@@ -56,7 +55,7 @@ public class BotDispatcher : MonoBehaviour
                 continue;
             }
 
-            if (registry.TryReserve(reservations, out Resource resource) == false)
+            if (registry.TryReserve(out Resource resource) == false)
             {
                 return;
             }
